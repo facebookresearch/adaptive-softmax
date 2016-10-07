@@ -1,17 +1,16 @@
 # Adaptive Softmax
-
 The adaptive-softmax project implements an efficient softmax approximation for graphical processing units (GPU).
-This method is useful for training language models with large vocabulary.
+This method is useful for training language models with large vocabularies.
 
 ## Dependencies
-
-cutorch
-cunn
-cudnn
-penlight
-torch-tds
-rnnlib
-torchnet
+This project depends on the following packages:
+- [cutorch](https://github.com/torch/cutorch)
+- [cunn](https://github.com/torch/cunn)
+- [cudnn](https://github.com/soumith/cudnn.torch)
+- [torch-tds](https://github.com/torch/tds)
+- [torchnet](https://github.com/torchnet/torchnet)
+- [torch-rnnlib](https://github.com/facebookresearch/torch-rnnlib)
+- [penlight](https://github.com/stevedonovan/Penlight)
 
 ## Usage
 

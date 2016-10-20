@@ -23,25 +23,25 @@ torch.setheaptracking(true)
 local cmd = torch.CmdLine('-', '-')
 cmd:option('-seed', 1111, 'Seed for the random generator')
 
-cmd:option('-isz', 128, 'Dimension of input word vectors')
-cmd:option('-nhid', 128, 'Number of hidden variables per layer')
-cmd:option('-nlayer', 1, 'Number of layers')
-cmd:option('-lambda', 0.0, 'L2 regularization parameters')
+cmd:option('-isz',     128, 'Dimension of input word vectors')
+cmd:option('-nhid',    128, 'Number of hidden variables per layer')
+cmd:option('-nlayer',  1,   'Number of layers')
 cmd:option('-dropout', 0.0, 'Dropout probability')
 
-cmd:option('-lr', 0.1, 'Learning rate')
-cmd:option('-epsilon', 1e-6, 'Epsilon for Adagrad')
-cmd:option('-initrange', 0.1, 'Init range')
-cmd:option('-maxepoch', 10, 'Number of epochs')
-cmd:option('-bptt', 20, 'Number of backprop through time steps')
-cmd:option('-clip', 1, 'Threshold for clipping gradients w.r.t. params')
-cmd:option('-batchsize', 20, 'Batch size')
+cmd:option('-lr',            0.1,  'Learning rate')
+cmd:option('-epsilon',       1e-5, 'Epsilon for Adagrad')
+cmd:option('-initrange',     0.1,  'Init range')
+cmd:option('-maxepoch',      10,   'Number of epochs')
+cmd:option('-bptt',          20,   'Number of backprop through time steps')
+cmd:option('-clip',          0.25, 'Threshold for gradient clipping')
+cmd:option('-batchsize',     16,   'Batch size')
+cmd:option('-testbatchsize', 16,   'Batch size for test')
 
-cmd:option('-data', '', 'Path to the dataset directory')
-cmd:option('-outdir', '', 'Path to the output directory')
-cmd:option('-threshold', 0, 'Threshold for <unk> words')
+cmd:option('-data',      '', 'Path to the dataset directory')
+cmd:option('-outdir',    '', 'Path to the output directory')
+cmd:option('-threshold', 0,  'Threshold for <unk> words')
 
-cmd:option('-cutoff', '', 'Cutoff for AdaptiveSoftMax')
+cmd:option('-cutoff', '',   'Cutoff for AdaptiveSoftMax')
 
 cmd:option('-usecudnn', false, '')
 
@@ -82,6 +82,7 @@ collectgarbage()
 
 local ntoken = #dic.idx2word
 local bsz    = config.batchsize
+local tbsz   = config.testbatchsize
 local bptt   = config.bptt
 
 local batch = {
@@ -91,9 +92,9 @@ local batch = {
 }
 collectgarbage()
 
-local train = tnt.DatasetIterator(tnt.RNNDataset(batch.train, bsz, bptt))
-local valid = tnt.DatasetIterator(tnt.RNNDataset(batch.valid, bsz, bptt))
-local test  = tnt.DatasetIterator(tnt.RNNDataset(batch.test , bsz, bptt))
+local train = tnt.DatasetIterator(tnt.RNNDataset(batch.train, bsz,  bptt))
+local valid = tnt.DatasetIterator(tnt.RNNDataset(batch.valid, tbsz, bptt))
+local test  = tnt.DatasetIterator(tnt.RNNDataset(batch.test , tbsz, bptt))
 
 --------------------------------------------------------------------------------
 -- MAKE MODEL
@@ -163,7 +164,7 @@ local function runvalidation(network, criterion, iterator)
    local meter  = tnt.AverageValueMeter()
 
    function engine.hooks.onStart(state)
-      state.hid = rnn:initializeHidden(bsz)
+      state.hid = rnn:initializeHidden(tbsz)
    end
 
    engine.hooks.onSample = onsample
@@ -213,7 +214,7 @@ function engine.hooks.onBackward(state)
    local variance  = state.optim.lutVariance
    variance:indexAdd(1, idx, torch.pow(gradinput, 2):mean(2))
    gradinput:cdiv(torch.sqrt(variance:index(1, idx):expandAs(gradinput)))
-   lut:accUpdateGradParameters(state.inputlut, model.gradInput[2], config.lr)
+   lut:accUpdateGradParameters(state.inputlut, model.gradInput[2], state.config.learningRate)
 end
 
 function engine.hooks.onUpdate(state)
@@ -276,7 +277,6 @@ end
 tottimer:reset()
 local config_opt = {
    learningRate = config.lr,
-   weightDecay  = config.lambda,
 }
 
 engine:train{

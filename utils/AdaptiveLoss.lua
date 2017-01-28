@@ -26,7 +26,7 @@ function AdaptiveLoss:remapTarget(target)
       if m:any() then
          table.insert(new_target, target[m]:add(-cutoff[i]))
       else
-         table.insert(new_target, false)
+         table.insert(new_target, {})
       end
    end
    return new_target
@@ -40,7 +40,7 @@ function AdaptiveLoss:updateOutput(input, target)
    self.gradInput = {}
 
    for i = 1, #input do
-      if input[i] then
+      if torch.isTensor(input[i]) then
          assert(target[i]:min() > 0 and target[i]:max() <= input[i]:size(2))
          local criterion = self.criterions[i]
          self.output = self.output + criterion:updateOutput(input[i], target[i])

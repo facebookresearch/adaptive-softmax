@@ -43,12 +43,11 @@ function AdaptiveLoss:updateOutput(input, target)
       if torch.isTensor(input[i]) then
          assert(target[i]:min() > 0 and target[i]:max() <= input[i]:size(2))
          local criterion = self.criterions[i]
-         self.output = self.output + criterion:updateOutput(input[i], target[i])
+         local loss = criterion:updateOutput(input[i], target[i])
+         self.output = self.output + loss
          self.gradInput[i] = criterion:updateGradInput(input[i], target[i])
-         self.gradInput[i]:mul(1.0 / bsz)
       end
    end
-   self.output = self.output / bsz
    return self.output
 end
 

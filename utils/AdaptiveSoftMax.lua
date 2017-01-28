@@ -126,10 +126,12 @@ end
 
 function AdaptiveSoftMax:getLogProb(input)
    local lsm   = nn.LogSoftMax():cuda()
+
+   self.head:updateOutput(input)
+
    local bsz   = self.head.output:size(1)
    local proba = torch.zeros(bsz, self.cutoff[#self.cutoff]):cuda()
 
-   self.head:updateOutput(input)
    lsm:updateOutput(self.head.output)
    proba:narrow(2, 1, self.hsz):add(lsm.output:narrow(2, 1, self.hsz))
 

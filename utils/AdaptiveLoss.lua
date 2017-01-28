@@ -60,4 +60,5 @@ function AdaptiveLoss:cuda()
    for i = 1, #self.criterions do
       self.criterions[i]:cuda()
    end
+   return self
 end

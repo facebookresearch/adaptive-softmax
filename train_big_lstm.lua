@@ -18,6 +18,8 @@ local optim   = require 'optim'
 local data    = require 'data'
 local utils   = require 'utils'
 
+local word2vec = require 'utils.word2vec'
+
 torch.setheaptracking(true)
 
 local cmd = torch.CmdLine('-', '-')
@@ -27,6 +29,7 @@ cmd:option('-isz',     128, 'Dimension of input word vectors')
 cmd:option('-nhid',    128, 'Number of hidden variables per layer')
 cmd:option('-nlayer',  1,   'Number of layers')
 cmd:option('-dropout', 0.0, 'Dropout probability')
+cmd:option('-lambda',  0.0, 'Weight decay parameter')
 
 cmd:option('-lr',            0.1,  'Learning rate')
 cmd:option('-epsilon',       1e-5, 'Epsilon for Adagrad')
@@ -42,6 +45,8 @@ cmd:option('-outdir',    '', 'Path to the output directory')
 cmd:option('-threshold', 0,  'Threshold for <unk> words')
 
 cmd:option('-cutoff', '',   'Cutoff for AdaptiveSoftMax')
+
+cmd:option('-embedding', '', '')
 
 cmd:option('-usecudnn', false, '')
 
@@ -118,6 +123,17 @@ table.insert(cutoff, ntoken)
 
 local decoder = nn.AdaptiveSoftMax(config.nhid, cutoff)
 local crit = nn.AdaptiveLoss(cutoff)
+
+if config.embedding ~= '' then
+   local embedding = word2vec.load(config.embedding)
+   for i = 1, ntoken do
+      local vec = embedding[dic.idx2word[i]]
+      if vec then
+         lut.weight[i]:copy(vec)
+         --decoder.head.weight[i]:copy(vec:mul(initrange))
+      end
+   end
+end
 
 onsample = function(state)
    state.inputlut = state.sample.input:cuda()
@@ -269,7 +285,7 @@ function engine.hooks.onEndEpoch(state)
    logtimer:reset()
    timer:reset()
 
-   if state.epoch >= 5 then
+   if state.epoch >= config.maxepoch / 2 then
       state.config.learningRate = state.config.learningRate / 2
    end
 end
@@ -277,6 +293,7 @@ end
 tottimer:reset()
 local config_opt = {
    learningRate = config.lr,
+   weightDecay  = config.lambda,
 }
 
 engine:train{
@@ -291,7 +308,6 @@ engine:train{
 --------------------------------------------------------------------------------
 -- MODEL SAVING
 --------------------------------------------------------------------------------
-
 if config.outdir ~= '' then
    local model = nn.Sequential()
       :add(nn.ParallelTable()

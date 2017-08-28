@@ -46,7 +46,7 @@ function AdaptiveSoftMax:setTarget(target)
          -- the nonzero function is not implemented for CudaTensor :(
          table.insert(self.idx, m:float():nonzero():squeeze(2))
       else
-         table.insert(self.idx, false)
+         table.insert(self.idx, {})
       end
    end
 end
@@ -58,11 +58,11 @@ function AdaptiveSoftMax:updateOutput(input)
    table.insert(self.output, self.head.output)
 
    for i = 1, #self.idx do
-      if self.idx[i] then
+      if torch.isTensor(self.idx[i]) then
          self.tail[i]:updateOutput(input:index(1, self.idx[i]))
          table.insert(self.output, self.tail[i].output)
       else
-         table.insert(self.output, false)
+         table.insert(self.output, {})
       end
    end
 
@@ -76,7 +76,7 @@ function AdaptiveSoftMax:updateGradInput(input, gradOutput)
    self.gradInput:copy(self.head.gradInput)
 
    for i = 1, #self.idx do
-      if self.idx[i] then
+      if torch.isTensor(self.idx[i]) then
          self.tail[i]:updateGradInput(input:index(1, self.idx[i]), gradOutput[i+1])
          self.gradInput:indexAdd(1, self.idx[i], self.tail[i].gradInput)
       end
@@ -89,7 +89,7 @@ function AdaptiveSoftMax:accGradParameters(input, gradOutput)
    self.head:accGradParameters(input, gradOutput[1])
 
    for i = 1, #self.idx do
-      if self.idx[i] then
+      if torch.isTensor(self.idx[i]) then
          self.tail[i]:accGradParameters(input:index(1, self.idx[i]), gradOutput[i+1])
       end
    end
@@ -126,10 +126,12 @@ end
 
 function AdaptiveSoftMax:getLogProb(input)
    local lsm   = nn.LogSoftMax():cuda()
+
+   self.head:updateOutput(input)
+
    local bsz   = self.head.output:size(1)
    local proba = torch.zeros(bsz, self.cutoff[#self.cutoff]):cuda()
 
-   self.head:updateOutput(input)
    lsm:updateOutput(self.head.output)
    proba:narrow(2, 1, self.hsz):add(lsm.output:narrow(2, 1, self.hsz))
 
